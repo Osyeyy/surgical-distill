@@ -1,1 +1,24 @@
-# config here
+{
+  "comment": "Phase 2 distillation config. See scripts/train.py for usage. The 'curriculum' field can be set to e.g. {\"all_until_frac\":0.2,\"argmin_after_frac\":0.8} to switch strategies over training.",
+
+  "use_qlora": true,
+  "freeze_projection": false,
+
+  "strategy": "topk_soft",
+  "top_k": 4,
+  "softmax_temp": 0.5,
+  "cosine_weight": 1.0,
+  "mse_weight": 0.1,
+
+  "lr": 5e-5,
+  "grad_clip": 1.0,
+  "max_length": 384,
+  "steps": 2000,
+  "log_every": 20,
+  "save_every": 500,
+
+  "dataset_name": "Malum0x/openhermes2.5-Perplexity_filtered_top30",
+  "dataset_split": "train",
+
+  "curriculum": null
+}
