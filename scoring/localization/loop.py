@@ -41,25 +41,29 @@ class DistillStep:
     @torch.no_grad()
     def _teacher_forward(self, batch):
         self._teacher_capture.attach()
-        self.teacher(**batch)
+        out = self.teacher(**batch)
         acts = self._teacher_capture.get_full()
         self._teacher_capture.detach()
-        return acts
+        return acts, out.logits.detach()
 
     def _student_forward(self, batch):
         self._student_capture.attach()
-        self.student(**batch)
+        out = self.student(**batch)
         acts = self._student_capture.get_full()
         self._student_capture.detach()
-        return acts
+        return acts, out.logits
 
     def step(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """
         batch: dict of input_ids / attention_mask, already on device.
-        Returns: {'loss', 'selected', 'similarities', 'weights'}.
+        Returns: {'loss', 'selected', 'similarities', 'weights',
+                  'student_logits', 'teacher_logits'}.
+        Caller can add output-level losses (KL etc.) using the logits.
         """
         batch = {k: v.to(self.device) for k, v in batch.items()}
-        teacher_acts = self._teacher_forward(batch)
-        student_acts = self._student_forward(batch)
+        teacher_acts, teacher_logits = self._teacher_forward(batch)
+        student_acts, student_logits = self._student_forward(batch)
         out = self.selector(student_acts, teacher_acts, self.projection, self.layer_map)
+        out["student_logits"] = student_logits
+        out["teacher_logits"] = teacher_logits
         return out

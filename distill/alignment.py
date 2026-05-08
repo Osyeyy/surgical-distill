@@ -14,9 +14,14 @@ from typing import Dict, List, Optional
 from models.loader import STUDENT_LAYERS, TEACHER_LAYERS
 
 
-def proportional_map(n_student: int = STUDENT_LAYERS, n_teacher: int = TEACHER_LAYERS) -> Dict[int, int]:
-    """student i -> teacher round(i * L_t / L_s).  Endpoints align (0→0, L_s-1 → L_t-1)."""
-    return {i: int(round(i * n_teacher / n_student)) for i in range(n_student)}
+def proportional_map(n_student: int = STUDENT_LAYERS, n_teacher: int = TEACHER_LAYERS,
+                     last_n_skip: int = 0) -> Dict[int, int]:
+    """student i -> teacher round(i * L_t / L_s).
+    last_n_skip: drop the last K student layers from the map. Used to protect
+    the layers that feed the student's lm_head — pulling those toward teacher
+    space breaks the student's decoder coupling (verified the hard way in v1)."""
+    last_idx = n_student - last_n_skip
+    return {i: int(round(i * n_teacher / n_student)) for i in range(last_idx)}
 
 
 def refine_from_similarity_matrix(
@@ -57,9 +62,14 @@ def load_map(path: str) -> Dict[int, int]:
     return {int(k): v for k, v in d.items()}
 
 
-def get_or_make_map(path: Optional[str]) -> Dict[int, int]:
+def get_or_make_map(path: Optional[str], last_n_skip: int = 0) -> Dict[int, int]:
     if path and os.path.exists(path):
         print(f"alignment: loaded refined map from {path}")
-        return load_map(path)
-    print("alignment: using proportional initial map")
-    return proportional_map()
+        m = load_map(path)
+        if last_n_skip > 0:
+            cap = STUDENT_LAYERS - last_n_skip
+            m = {k: v for k, v in m.items() if k < cap}
+            print(f"alignment: last_n_skip={last_n_skip} -> dropped student layers >= {cap}")
+        return m
+    print(f"alignment: using proportional initial map (last_n_skip={last_n_skip})")
+    return proportional_map(last_n_skip=last_n_skip)

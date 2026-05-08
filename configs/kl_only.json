@@ -1,17 +1,17 @@
 {
-  "comment": "v1.1 — protects last 4 student layers (last_n_skip=4), adds output-level KL co-loss to anchor generation, drops MSE term from activation loss (was causing magnitude spikes), softmax_temp=1.5 (was 0.5) to spread layer attention, lr lowered to 1e-5.",
+  "comment": "Arm B — KL-only control. Same hyperparameters as v1.1 but act_weight=0 so the activation signal contributes nothing. Tells us what plain KL distillation alone achieves at this compute budget.",
 
   "use_qlora": true,
-  "freeze_projection": false,
+  "freeze_projection": true,
 
-  "strategy": "topk_soft",
+  "strategy": "all",
   "top_k": 4,
   "softmax_temp": 1.5,
   "cosine_weight": 1.0,
   "mse_weight": 0.0,
 
   "last_n_skip": 4,
-  "act_weight": 0.5,
+  "act_weight": 0.0,
   "kl_weight": 0.5,
   "kl_temperature": 2.0,
 

@@ -1,5 +1,5 @@
 {
-  "comment": "v1.1 — protects last 4 student layers (last_n_skip=4), adds output-level KL co-loss to anchor generation, drops MSE term from activation loss (was causing magnitude spikes), softmax_temp=1.5 (was 0.5) to spread layer attention, lr lowered to 1e-5.",
+  "comment": "Arm C — activation-leaning. Same as v1.1 but kl_weight scaled down 100x (0.5 -> 0.005) so the KL term anchors lm_head without drowning out the per-layer activation signal. With act_loss ~0.35 and KL ~200, the new combined contributions are ~0.35 (act) and ~1.0 (KL) — comparable.",
 
   "use_qlora": true,
   "freeze_projection": false,
@@ -11,8 +11,8 @@
   "mse_weight": 0.0,
 
   "last_n_skip": 4,
-  "act_weight": 0.5,
-  "kl_weight": 0.5,
+  "act_weight": 1.0,
+  "kl_weight": 0.005,
   "kl_temperature": 2.0,
 
   "lr": 1e-5,

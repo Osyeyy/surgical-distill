@@ -19,13 +19,14 @@ import time
 from collections import Counter
 
 import torch
+import torch.nn.functional as F
 from datasets import load_dataset
 from torch.optim import AdamW
 from tqdm import tqdm
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from models.loader import load_both, STUDENT_HIDDEN, TEACHER_HIDDEN, STUDENT_LAYERS
+from models.loader import load_both, STUDENT_HIDDEN, TEACHER_HIDDEN, STUDENT_LAYERS, VOCAB_SIZE
 from models.projection import HiddenProjection
 from distill.alignment import get_or_make_map
 from scoring.divergence import DivergenceSelector, DivergenceConfig
@@ -115,8 +116,8 @@ def main():
             p_.requires_grad = False
     projection.train()
 
-    # 3. layer map
-    layer_map = get_or_make_map(args.alignment_path)
+    # 3. layer map (last_n_skip protects the layers that feed the student's lm_head)
+    layer_map = get_or_make_map(args.alignment_path, last_n_skip=cfg.get("last_n_skip", 0))
 
     # 4. selector
     sel_cfg = DivergenceConfig(
@@ -162,7 +163,23 @@ def main():
             break
 
         out = step_runner.step(batch)
-        loss = out["loss"]
+        act_loss = out["loss"]
+
+        # Output-level KL co-loss (student || teacher) on shared vocab portion only.
+        # Anchors generation coherence so activation pulling can't break the lm_head.
+        kl_w = cfg.get("kl_weight", 0.0)
+        if kl_w > 0:
+            T = cfg.get("kl_temperature", 2.0)
+            shared = min(VOCAB_SIZE, out["student_logits"].size(-1), out["teacher_logits"].size(-1))
+            s_log_p = F.log_softmax(out["student_logits"][..., :shared].float() / T, dim=-1)
+            t_p     = F.softmax(out["teacher_logits"][..., :shared].float() / T, dim=-1)
+            kl = F.kl_div(s_log_p, t_p, reduction="batchmean") * (T * T)
+            loss = cfg.get("act_weight", 1.0) * act_loss + kl_w * kl
+            kl_val = float(kl.item())
+        else:
+            loss = act_loss
+            kl_val = None
+
         optim.zero_grad()
         loss.backward()
         if cfg.get("grad_clip", 1.0):
@@ -177,13 +194,17 @@ def main():
             log_entry = {
                 "step": step,
                 "loss": float(loss.item()),
+                "act_loss": float(act_loss.item()),
+                "kl_loss": kl_val,
                 "strategy": selector.cfg.strategy,
                 "top_selected": [list(top_layer[0]), top_layer[1]] if top_layer else None,
                 "elapsed_s": time.time() - t0,
             }
             log_f.write(json.dumps(log_entry) + "\n")
             log_f.flush()
-            pbar.set_postfix(loss=f"{loss.item():.4f}", strat=selector.cfg.strategy)
+            pbar.set_postfix(loss=f"{loss.item():.4f}", act=f"{act_loss.item():.3f}",
+                             kl=f"{kl_val:.3f}" if kl_val is not None else "off",
+                             strat=selector.cfg.strategy)
 
         if step > 0 and step % save_every == 0:
             student.save_pretrained(os.path.join(args.output_dir, f"checkpoint-{step}"))

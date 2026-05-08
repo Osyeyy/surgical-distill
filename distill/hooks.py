@@ -28,16 +28,24 @@ class ActivationCapture:
         self._cast = cast_to_float
 
     def _get_layers(self):
-        """Walk PEFT / base_model / model wrappers to find a ModuleList of layers."""
+        """Walk PEFT / base_model / model wrappers iteratively to find a layer ModuleList.
+        PEFT-wrapped models nest as PeftModel.base_model.model.model.layers — flat
+        unwrap isn't enough."""
         m = self.model
-        for attr in ("base_model", "model"):
-            inner = getattr(m, attr, None)
-            if inner is not None:
-                m = inner
-        for attr in ("layers", "h", "blocks"):
-            layers = getattr(m, attr, None)
-            if layers is not None and isinstance(layers, torch.nn.ModuleList):
-                return layers
+        for _ in range(8):                         # bounded depth
+            for attr in ("layers", "h", "blocks"):
+                layers = getattr(m, attr, None)
+                if isinstance(layers, torch.nn.ModuleList):
+                    return layers
+            descended = False
+            for attr in ("base_model", "model", "transformer"):
+                inner = getattr(m, attr, None)
+                if inner is not None and inner is not m:
+                    m = inner
+                    descended = True
+                    break
+            if not descended:
+                break
         raise ValueError(
             "could not auto-detect transformer layers. "
             "pass layer_path='model.layers' explicitly."
