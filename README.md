@@ -11,7 +11,7 @@ The method as configured here doesn't help. The failure modes are clean and diag
 ## Setup
 
 - **Teacher:** [Qwen/Qwen2.5-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct), loaded in 4-bit nf4, frozen
-- **Student:** [Malum0x/mlp-surgery-restored-top30](https://huggingface.co/Malum0x/mlp-surgery-restored-top30) — a Qwen2.5-3B-Instruct previously SFT-damaged and recovered via the [mlp-surgery](https://github.com/Malum0x/mlp-surgery) project
+- **Student:** [Osye/mlp-surgery-restored-top30](https://huggingface.co/Osye/mlp-surgery-restored-top30) — a Qwen2.5-3B-Instruct previously SFT-damaged and recovered via the [mlp-surgery](https://github.com/Osyeyy/mlp-surgery) project
 - **Hardware:** single RTX 4090 (24 GB)
 
 The student is intentionally not vanilla Qwen2.5-3B-Instruct. Starting from the restored checkpoint keeps attribution clean (we're testing whether distillation pushes past base, not whether *any* training does).
@@ -127,7 +127,7 @@ bash run_arms_bc.sh
 
 # Eval any checkpoint
 python scoring/eval/baseline.py \
-    --model_arg "pretrained=Malum0x/mlp-surgery-restored-top30,peft=$(pwd)/logs/phase2_v1_1/final" \
+    --model_arg "pretrained=Osye/mlp-surgery-restored-top30,peft=$(pwd)/logs/phase2_v1_1/final" \
     --output_dir logs/phase2_v1_1/eval
 ```
 
@@ -161,9 +161,9 @@ Worth doing only if v2's signal isn't a clean tie like v1.
 ## Related
 
 - **Sister projects** (the connected arc):
-  - [Perplexity-weighted-selective-finetuning](https://github.com/Malum0x/Perplexity-weighted-selective-finetuning) — found that perplexity filtering doesn't protect reasoning during SFT.
-  - [mlp-surgery](https://github.com/Malum0x/mlp-surgery) — gradient-norm scoring + MLP-layer restoration. The student in this project is an output of mlp-surgery.
-  - [layer-vision](https://github.com/Malum0x/layer-vision) — real-time MLP activation visualizer.
+  - [Perplexity-weighted-selective-finetuning](https://github.com/Osyeyy/Perplexity-weighted-selective-finetuning) — found that perplexity filtering doesn't protect reasoning during SFT.
+  - [mlp-surgery](https://github.com/Osyeyy/mlp-surgery) — gradient-norm scoring + MLP-layer restoration. The student in this project is an output of mlp-surgery.
+  - [layer-vision](https://github.com/Osyeyy/layer-vision) — real-time MLP activation visualizer.
 - **References:**
   - ROME (Meng et al., 2022) — factual knowledge in MLP layers
   - TinyBERT, MiniLM — layer-wise distillation
